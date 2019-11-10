@@ -1,0 +1,16 @@
+dist: xenial
+language: c
+compiler: clang
+
+env:
+  - SHARE_ARTIFACTS=1
+
+before_script:
+  - chmod +x ./build.sh
+
+jobs:
+  include:
+    - stage: Build
+      name: "Build firmware"
+      script:
+        - bash ./build.sh
