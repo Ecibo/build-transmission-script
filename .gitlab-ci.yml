@@ -1,0 +1,42 @@
+image: buildpack-deps:testing
+
+before_script:
+  - apt-get update -y
+  - apt-get install -y clang intltool
+  - chmod +x *.sh
+
+build_clang:
+  stage: build
+  when: always
+  script:
+    - apt-get install -y clang
+    - bash ./build.sh
+  cache:
+    key: dep_clang_0
+    paths:
+      - build_deps
+  artifacts:
+    paths:
+      - binary
+    expire_in: 5 days
+    expose_as: transmission build result
+
+build_clang_ptversion:
+  stage: build
+  when: manual
+  variables:
+    TRANSMISSION_VER: '3.00'
+    MODIFY_VERSION: '2.84'
+    MODIFY_PEERVER: '2840'
+  script:
+    - apt-get install -y clang
+    - bash ./build.sh
+  cache:
+    key: dep_clang_0
+    paths:
+      - build_deps
+  artifacts:
+    paths:
+      - binary
+    expire_in: 5 days
+    expose_as: transmission build result
