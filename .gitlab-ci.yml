@@ -1,42 +1,127 @@
-image: buildpack-deps:testing
+default:
+  image: buildpack-deps:stable
+  before_script:
+    - apt-get update -y
+    - apt-get install -y intltool
+    - chmod +x *.sh
 
-before_script:
-  - apt-get update -y
-  - apt-get install -y clang intltool
-  - chmod +x *.sh
+build_libs_gcc:
+  stage: build
+  when: manual
+  script:
+    - apt-get install -y clang
+    - bash ./build.sh
+  variables:
+    BUILD_DEPS_ONLY: 'yes'
+    CC: gcc
+    CXX: g++
+  cache:
+    key: deps_cfpp_gcc
+    paths: [ build_deps ]
+
+build_gcc:
+  stage: build
+  when: manual
+  script:
+    - bash ./build.sh
+  variables:
+    CC: gcc
+    CXX: g++
+  cache:
+    key: deps_cfpp_gcc
+    paths: [ build_deps ]
+  artifacts:
+    paths: [ binary ]
+    expose_as: transmission build result
+
+build_libs_clang:
+  stage: build
+  when: manual
+  script:
+    - apt-get install -y clang
+    - bash ./build.sh
+  variables:
+    BUILD_DEPS_ONLY: 'yes'
+    CC: clang
+    CXX: clang++
+  cache:
+    key: deps_cfpp_clang
+    paths: [ build_deps ]
 
 build_clang:
   stage: build
-  when: always
+  when: manual
   script:
     - apt-get install -y clang
     - bash ./build.sh
+  variables:
+    CC: clang
+    CXX: clang++
   cache:
-    key: dep_clang_0
-    paths:
-      - build_deps
+    key: deps_cfpp_clang
+    paths: [ build_deps ]
   artifacts:
-    paths:
-      - binary
-    expire_in: 5 days
+    paths: [ binary ]
     expose_as: transmission build result
 
-build_clang_ptversion:
+build_libs_old_gcc:
+  image: buildpack-deps:oldoldstable
   stage: build
   when: manual
+  script:
+    - bash ./build.sh
   variables:
-    TRANSMISSION_VER: '3.00'
-    MODIFY_VERSION: '2.84'
-    MODIFY_PEERVER: '2840'
+    BUILD_DEPS_ONLY: 'yes'
+    CC: gcc
+    CXX: g++
+  cache:
+    key: deps_cfpp_old_gcc
+    paths: [ build_deps ]
+
+build_old_gcc:
+  image: buildpack-deps:oldoldstable
+  stage: build
+  when: manual
+  script:
+    - bash ./build.sh
+  variables:
+    CC: gcc
+    CXX: g++
+  cache:
+    key: deps_cfpp_old_gcc
+    paths: [ build_deps ]
+  artifacts:
+    paths: [ binary ]
+    expose_as: transmission build result
+
+build_libs_old_clang:
+  image: buildpack-deps:oldoldstable
+  stage: build
+  when: manual
   script:
     - apt-get install -y clang
     - bash ./build.sh
+  variables:
+    BUILD_DEPS_ONLY: 'yes'
+    CC: clang
+    CXX: clang++
   cache:
-    key: dep_clang_0
-    paths:
-      - build_deps
+    key: deps_cfpp_old_clang
+    paths: [ build_deps ]
+
+build_old_clang:
+  image: buildpack-deps:oldoldstable
+  stage: build
+  when: manual
+  script:
+    - apt-get install -y clang
+    - bash ./build.sh
+  variables:
+    CC: clang
+    CXX: clang++
+  cache:
+    key: deps_cfpp_old_clang
+    paths: [ build_deps ]
   artifacts:
-    paths:
-      - binary
-    expire_in: 5 days
+    paths: [ binary ]
     expose_as: transmission build result

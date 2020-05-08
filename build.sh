@@ -7,36 +7,44 @@ export HOME=`pwd`
 #sudo apt-get install --no-install-recommends -y wget curl ca-certificates xz-utils build-essential pkg-config clang
 
 ## DEPENDENCES ##
+DEPS_VER="002"
+
 TRANSMISSION_VER=${TRANSMISSION_VER:-master}
-C_ARES_VER=${C_ARES_VER:-1.14.0}
-OPENSSL_VER=${OPENSSL_VER:-1.1.1f}
+C_ARES_VER=${C_ARES_VER:-1.16.0}
+OPENSSL_VER=${OPENSSL_VER:-1.1.1g}
 ZLIB_VER=${ZLIB_VER:-1.2.11}
 LIBIDN2_VER=${LIBIDN2_VER:-2.3.0}
 LIBEVENT_VER=${LIBEVENT_VER:-2.1.11-stable}
 # LIBSSH2_VER=${LIBSSH2_VER:-1.9.0}
 NGHTTP2_VER=${NGHTTP2_VER:-1.40.0}
-CURL_VER=${CURL_VER:-7.69.1}
+CURL_VER=${CURL_VER:-7.70.0}
+
+TRANSMISSION_GITURL="https://gitlab.com/mitsui/01c00ea2.git"
 
 PREFIX=$HOME/build_deps
-BUILD_DIRECTORY=$HOME/transmission_build
-BUILD_BINARY_DIR=$HOME/binary
+PREFIX_TRANSMISSION=$HOME/build_result
+BUILD_DIRECTORY=$HOME/build_sources
+ARTIFACTS_DIR=$HOME/binary
 
 DOWNLOADER='curl -LO'
 NUM_THREAD=-j`nproc`
+[ -n "$NO_CI_CACHE" ] && PREFIX=$PREFIX-no_ci_cache
+[ -f $PREFIX/DEPMARK_$DEPS_VER ] || rm -rf $PREFIX || true
+[ -n "$BUILD_DEPS_ONLY" ] && rm -rf $PREFIX || true
 
-mkdir -p $PREFIX
-mkdir -p $BUILD_DIRECTORY
-mkdir -p $BUILD_BINARY_DIR
+mkdir -p $PREFIX || true
+mkdir -p $BUILD_DIRECTORY || true
+mkdir -p $ARTIFACTS_DIR || true
+mkdir -p $PREFIX_TRANSMISSION || true
 
-export CC=${CC:-clang}
-export CXX=${CXX:-clang++}
+
+C_ARES_CFLAGS=$CFLAGS
 export PKG_CONFIG='pkg-config --static'
 export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig/
 export LD_LIBRARY_PATH=$PREFIX/lib/
-export CFLAGS=-I$PREFIX/include
-export LDFLAGS=-L$PREFIX/lib
-export CXXFLAGS=$CFLAGS
-C_ARES_CFLAGS=''
+export CFLAGS="$CFLAGS -I$PREFIX/include"
+export CXXFLAGS="$CXXFLAGS -I$PREFIX/include"
+export LDFLAGS="$LDFLAGS -L$PREFIX/lib"
 
 echo 'CC and CXX tool:'
 $CC --version || true
@@ -89,7 +97,7 @@ build_libevent() {
   $DOWNLOADER https://github.com/libevent/libevent/releases/download/release-$LIBEVENT_VER/libevent-$LIBEVENT_VER.tar.gz
   tar xf libevent-$LIBEVENT_VER.tar.gz
   cd libevent-$LIBEVENT_VER
-  LIBS=-ldl ./configure --prefix=$PREFIX --enable-static --disable-shared --disable-samples
+  LIBS=$LIBS' -ldl' ./configure --prefix=$PREFIX --enable-static --disable-shared --disable-samples
   make $NUM_THREAD
   make install
 }
@@ -119,7 +127,7 @@ build_curl() {
   $DOWNLOADER https://curl.haxx.se/download/curl-$CURL_VER.tar.xz
   tar xf curl-$CURL_VER.tar.xz
   cd curl-$CURL_VER
-  LIBS='-ldl -lpthread' ./configure --prefix=$PREFIX \
+  LIBS=$LIBS' -ldl -lpthread' ./configure --prefix=$PREFIX \
     --enable-optimize --enable-ares --enable-proxy --enable-gopher --enable-libcurl-option --enable-ipv6 --enable-static \
     --disable-debug --disable-curldebug --disable-manual --disable-ldap --disable-ldaps --disable-sspi --disable-rtsp --disable-tftp \
     --disable-dict --disable-smb --disable-gopher --disable-imap --disable-smtp --disable-telnet --disable-pop3 --disable-alt-svc --disable-shared \
@@ -132,7 +140,7 @@ build_curl() {
 build_transmission() {
   cd $BUILD_DIRECTORY
   echo '--------Prepare transmission sources--------'
-  git clone https://github.com/transmission/transmission.git transmission-src
+  git clone $TRANSMISSION_GITURL transmission-src
   cd transmission-src
   git checkout $TRANSMISSION_VER
   git submodule update --init --recursive
@@ -140,28 +148,16 @@ build_transmission() {
   [ -n "$MODIFY_PEERVER" ] && sed -E -i 's|m4_define\(\[peer_id_prefix\],\[\S+\]\)|m4_define([peer_id_prefix],[-TR'$MODIFY_PEERVER'-])|' configure.ac
   ./autogen.sh || true
   echo '--------Start transmission configure--------'
-  LDFLAGS='-static -Wl,-static -static-libgcc' LIBS='-ldl -lpthread -lrt -lm' ./configure --prefix=$PREFIX --enable-utp --enable-daemon --disable-nls --enable-static --disable-shared
+  LDFLAGS=$LDFLAGS' -Wl,-static -static-libgcc -static-libstdc++' LIBS=$LIBS' -ldl -lpthread -lrt -lm -lc' \
+    ./configure --prefix=$PREFIX_TRANSMISSION --enable-utp --enable-daemon --disable-nls --enable-static --disable-shared
   echo '-----------Building transmission------------'
   make $NUM_THREAD
   make install
 }
 
-clean_buildcache() {
-  cd $BUILD_DIRECTORY
-  rm -rf c-ares*
-  rm -rf transmission-*
-  rm -rf zlib-*
-  rm -rf curl-*
-  rm -rf openssl-*
-  rm -rf libssh2-*
-  rm -rf libidn2-*
-  rm -rf libevent-*
-  rm -rf nghttp2-*
-}
-
 pack_and_upload() {
   echo 'Uploading artifacts...'
-  cd $BUILD_BINARY_DIR
+  cd $ARTIFACTS_DIR
   local build_time=`date +"%Y%m%d%H%M%S"`
   tar --owner=0 --group=0 -cJf $HOME/transmissionbt.tar.xz *
   curl -T "$HOME/transmissionbt.tar.xz" "https://transfer.sh/transmissionbt-$build_time.tar.xz"
@@ -184,10 +180,14 @@ pack_and_upload() {
 [ -f $PREFIX/lib/libnghttp2.a ] || build_nghttp2
 [ -f $PREFIX/lib/libcurl.a ] || build_curl
 
+touch $PREFIX/DEPMARK_$DEPS_VER
+
+[ -n "$BUILD_DEPS_ONLY" ] && exit 0
+
 build_transmission
 
-mv $PREFIX/bin/transmission-* $BUILD_BINARY_DIR/
-cd $BUILD_BINARY_DIR
+mv $PREFIX_TRANSMISSION/bin/transmission-* $ARTIFACTS_DIR/
+cd $ARTIFACTS_DIR
 if [ "$(ls -A .)" ]; then
   strip -s -x transmission-* || true
   echo "build finished:"
