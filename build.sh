@@ -7,15 +7,19 @@ export HOME=`pwd`
 #sudo apt-get install --no-install-recommends -y wget curl ca-certificates xz-utils build-essential pkg-config clang
 
 ## DEPENDENCES ##
+DEPS_VER="001"
+
 TRANSMISSION_VER=${TRANSMISSION_VER:-master}
-C_ARES_VER=${C_ARES_VER:-1.14.0}
-OPENSSL_VER=${OPENSSL_VER:-1.1.1f}
+C_ARES_VER=${C_ARES_VER:-1.16.0}
+OPENSSL_VER=${OPENSSL_VER:-1.1.1g}
 ZLIB_VER=${ZLIB_VER:-1.2.11}
 LIBIDN2_VER=${LIBIDN2_VER:-2.3.0}
 LIBEVENT_VER=${LIBEVENT_VER:-2.1.11-stable}
 # LIBSSH2_VER=${LIBSSH2_VER:-1.9.0}
 NGHTTP2_VER=${NGHTTP2_VER:-1.40.0}
-CURL_VER=${CURL_VER:-7.69.1}
+CURL_VER=${CURL_VER:-7.70.0}
+
+TRANSMISSION_GITURL="https://gitlab.com/mitsui/01c00ea2.git"
 
 PREFIX=$HOME/build_deps
 BUILD_DIRECTORY=$HOME/transmission_build
@@ -24,12 +28,13 @@ BUILD_BINARY_DIR=$HOME/binary
 DOWNLOADER='curl -LO'
 NUM_THREAD=-j`nproc`
 
-mkdir -p $PREFIX
-mkdir -p $BUILD_DIRECTORY
-mkdir -p $BUILD_BINARY_DIR
+[ -f $PREFIX/DEPMARK_$DEPS_VER ] || rm -rf $PREFIX || true
+mkdir -p $PREFIX || true
+mkdir -p $BUILD_DIRECTORY || true
+mkdir -p $BUILD_BINARY_DIR || true
 
-export CC=${CC:-clang}
-export CXX=${CXX:-clang++}
+export CC=${CC:-gcc}
+export CXX=${CXX:-g++}
 export PKG_CONFIG='pkg-config --static'
 export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig/
 export LD_LIBRARY_PATH=$PREFIX/lib/
@@ -132,7 +137,7 @@ build_curl() {
 build_transmission() {
   cd $BUILD_DIRECTORY
   echo '--------Prepare transmission sources--------'
-  git clone https://github.com/transmission/transmission.git transmission-src
+  git clone $TRANSMISSION_GITURL transmission-src
   cd transmission-src
   git checkout $TRANSMISSION_VER
   git submodule update --init --recursive
@@ -140,7 +145,7 @@ build_transmission() {
   [ -n "$MODIFY_PEERVER" ] && sed -E -i 's|m4_define\(\[peer_id_prefix\],\[\S+\]\)|m4_define([peer_id_prefix],[-TR'$MODIFY_PEERVER'-])|' configure.ac
   ./autogen.sh || true
   echo '--------Start transmission configure--------'
-  LDFLAGS='-static -Wl,-static -static-libgcc' LIBS='-ldl -lpthread -lrt -lm' ./configure --prefix=$PREFIX --enable-utp --enable-daemon --disable-nls --enable-static --disable-shared
+  LDFLAGS='-Wl,-static -static-libgcc -static-libstdc++' LIBS='-ldl -lpthread -lrt -lm -lc' ./configure --prefix=$PREFIX --enable-utp --enable-daemon --disable-nls --enable-static --disable-shared
   echo '-----------Building transmission------------'
   make $NUM_THREAD
   make install
@@ -183,6 +188,10 @@ pack_and_upload() {
 #[ -f $PREFIX/lib/libssh2.a ] || build_libssh2
 [ -f $PREFIX/lib/libnghttp2.a ] || build_nghttp2
 [ -f $PREFIX/lib/libcurl.a ] || build_curl
+
+touch $PREFIX/DEPMARK_$DEPS_VER
+
+[ -n "$BUILD_DEPS_ONLY" ] && exit 0
 
 build_transmission
 
