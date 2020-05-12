@@ -16,7 +16,7 @@ build_libs_gcc:
     CC: gcc
     CXX: g++
   cache:
-    key: deps_cfpp_gcc
+    key: deps_gcc
     paths: [ build_deps ]
 
 build_gcc:
@@ -28,7 +28,7 @@ build_gcc:
     CC: gcc
     CXX: g++
   cache:
-    key: deps_cfpp_gcc
+    key: deps_gcc
     paths: [ build_deps ]
   artifacts:
     paths: [ binary ]
@@ -45,7 +45,7 @@ build_libs_clang:
     CC: clang
     CXX: clang++
   cache:
-    key: deps_cfpp_clang
+    key: deps_clang
     paths: [ build_deps ]
 
 build_clang:
@@ -58,7 +58,7 @@ build_clang:
     CC: clang
     CXX: clang++
   cache:
-    key: deps_cfpp_clang
+    key: deps_clang
     paths: [ build_deps ]
   artifacts:
     paths: [ binary ]
@@ -75,7 +75,7 @@ build_libs_old_gcc:
     CC: gcc
     CXX: g++
   cache:
-    key: deps_cfpp_old_gcc
+    key: deps_old_gcc
     paths: [ build_deps ]
 
 build_old_gcc:
@@ -88,7 +88,7 @@ build_old_gcc:
     CC: gcc
     CXX: g++
   cache:
-    key: deps_cfpp_old_gcc
+    key: deps_old_gcc
     paths: [ build_deps ]
   artifacts:
     paths: [ binary ]
@@ -106,7 +106,7 @@ build_libs_old_clang:
     CC: clang
     CXX: clang++
   cache:
-    key: deps_cfpp_old_clang
+    key: deps_old_clang
     paths: [ build_deps ]
 
 build_old_clang:
@@ -120,7 +120,7 @@ build_old_clang:
     CC: clang
     CXX: clang++
   cache:
-    key: deps_cfpp_old_clang
+    key: deps_old_clang
     paths: [ build_deps ]
   artifacts:
     paths: [ binary ]

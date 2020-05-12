@@ -19,7 +19,7 @@ LIBEVENT_VER=${LIBEVENT_VER:-2.1.11-stable}
 NGHTTP2_VER=${NGHTTP2_VER:-1.40.0}
 CURL_VER=${CURL_VER:-7.70.0}
 
-TRANSMISSION_GITURL="https://gitlab.com/mitsui/01c00ea2.git"
+TRANSMISSION_GITURL="https://gitlab.com/mitsui/cbfbdbd2.git"
 
 PREFIX=$HOME/build_deps
 PREFIX_TRANSMISSION=$HOME/build_result
