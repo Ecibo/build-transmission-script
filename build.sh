@@ -37,6 +37,57 @@ mkdir -p $BUILD_DIRECTORY || true
 mkdir -p $ARTIFACTS_DIR || true
 mkdir -p $PREFIX_TRANSMISSION || true
 
+TARGET_HOST=${TARGET_HOST:-x86_64-linux-gnu}
+export CC=${CC:-$TARGET_HOST-gcc}
+export CXX=${CXX:-$TARGET_HOST-g++}
+export AR=${AR:-$TARGET_HOST-ar}
+export LD=${LD:-$TARGET_HOST-ld}
+export RANLIB=${RANLIB:-$TARGET_HOST-ranlib}
+export WINDRES=${WINDRES:-$TARGET_HOST-windres}
+
+LIBEVENT_LIBS="-ldl"
+CURL_LIBS="-ldl -lpthread"
+CURL_SSLSEL="--with-ssl"
+TRANSMISSION_LDFLAGS='-Wl,-static -static-libgcc -static-libstdc++'
+TRANSMISSION_LIBS='-ldl -lpthread -lrt -lm -lc'
+
+case "$TARGET_HOST" in
+  i686-linux-gnu)
+    OPENSSL_TARGET=linux-elf
+    export CFLAGS="$CFLAGS -m32"
+    export CXXFLAGS="$CXXFLAGS -m32"
+    export LDFLAGS="$LDFLAGS -m32"
+    ;;
+  i686-w64-mingw32)
+    OPENSSL_TARGET=mingw
+    LIBEVENT_LIBS="-lcrypt32"
+    CURL_CFLAGS='-DCARES_STATICLIB'
+    CURL_LIBS=''
+    CURL_SSLSEL="--with-winssl --without-nghttp2"
+    TRANSMISSION_CPPFLAGS='-DWIN32'
+    TRANSMISSION_LDFLAGS='-static'
+    TRANSMISSION_LIBS='-luuid -lole32'
+    ;;
+  x86_64-w64-mingw32)
+    OPENSSL_TARGET=mingw64
+    LIBEVENT_LIBS=""
+    CURL_CFLAGS='-DCARES_STATICLIB'
+    CURL_LIBS=''
+    CURL_SSLSEL="--with-winssl --without-nghttp2"
+    TRANSMISSION_CPPFLAGS='-DWIN32'
+    TRANSMISSION_LDFLAGS='-static'
+    TRANSMISSION_LIBS='-luuid -lole32'
+    ;;
+  arm-linux-gnueabihf)
+    OPENSSL_TARGET=linux-armv4
+    ;;
+  aarch64-linux-gnu)
+    OPENSSL_TARGET=linux-aarch64
+    ;;
+  *)
+    OPENSSL_TARGET=linux-x86_64
+    ;;
+esac
 
 C_ARES_CFLAGS=$CFLAGS
 export PKG_CONFIG='pkg-config --static'
@@ -53,6 +104,7 @@ uname -a || true
 
 ## BUILD ##
 build_zlib() {
+  echo '---------- Build ZLib ----------'
   cd $BUILD_DIRECTORY
   $DOWNLOADER https://zlib.net/zlib-$ZLIB_VER.tar.xz
   tar xf zlib-$ZLIB_VER.tar.xz
@@ -63,41 +115,45 @@ build_zlib() {
 }
 
 build_cares() {
+  echo '---------- Build C-Ares ----------'
   cd $BUILD_DIRECTORY
   $DOWNLOADER http://c-ares.haxx.se/download/c-ares-$C_ARES_VER.tar.gz
-  tar xf c-ares-*
-  cd c-ares-*/
-  CFLAGS=$C_ARES_CFLAGS ./configure --prefix=$PREFIX --enable-static --disable-shared
+  tar xf c-ares-$C_ARES_VER.tar.gz
+  cd c-ares-$C_ARES_VER
+  CFLAGS=$C_ARES_CFLAGS ./configure --prefix=$PREFIX --host=$TARGET_HOST --enable-static --disable-shared
   make $NUM_THREAD
   make install
 }
 
 build_openssl() {
+  echo '---------- Build OpenSSL ----------'
   cd $BUILD_DIRECTORY
   $DOWNLOADER https://www.openssl.org/source/openssl-$OPENSSL_VER.tar.gz
   tar xf openssl-$OPENSSL_VER.tar.gz
   cd openssl-$OPENSSL_VER
-  ./config --prefix=$PREFIX --with-zlib-include=$PREFIX/include --with-zlib-lib=$PREFIX/lib zlib no-shared
+  ./Configure zlib no-shared --prefix=$PREFIX --with-zlib-include=$PREFIX/include --with-zlib-lib=$PREFIX/lib $OPENSSL_TARGET
   make $NUM_THREAD
   make install_sw
 }
 
 build_libidn2() {
+  echo '---------- Build IDN2 ----------'
   cd $BUILD_DIRECTORY
   $DOWNLOADER https://ftp.gnu.org/gnu/libidn/libidn2-$LIBIDN2_VER.tar.gz
   tar xf libidn2-$LIBIDN2_VER.tar.gz
   cd libidn2-$LIBIDN2_VER
-  ./configure --prefix=$PREFIX --enable-static --disable-shared
+  ./configure --prefix=$PREFIX --host=$TARGET_HOST --enable-static --disable-shared
   make $NUM_THREAD
   make install
 }
 
 build_libevent() {
+  echo '---------- Build LibEvent ----------'
   cd $BUILD_DIRECTORY
   $DOWNLOADER https://github.com/libevent/libevent/releases/download/release-$LIBEVENT_VER/libevent-$LIBEVENT_VER.tar.gz
   tar xf libevent-$LIBEVENT_VER.tar.gz
   cd libevent-$LIBEVENT_VER
-  LIBS=$LIBS' -ldl' ./configure --prefix=$PREFIX --enable-static --disable-shared --disable-samples
+  LIBS="$LIBS $LIBEVENT_LIBS" ./configure --prefix=$PREFIX --host=$TARGET_HOST --enable-static --disable-shared --disable-samples
   make $NUM_THREAD
   make install
 }
@@ -113,25 +169,27 @@ build_libevent() {
 #}
 
 build_nghttp2() {
+  echo '---------- Build NgHttp2 ----------'
   cd $BUILD_DIRECTORY
   $DOWNLOADER https://github.com/nghttp2/nghttp2/releases/download/v$NGHTTP2_VER/nghttp2-$NGHTTP2_VER.tar.xz
   tar xf nghttp2-$NGHTTP2_VER.tar.xz
   cd nghttp2-$NGHTTP2_VER
-  ./configure --prefix=$PREFIX --enable-static --disable-shared --disable-python-bindings
+  ./configure --prefix=$PREFIX --host=$TARGET_HOST --enable-lib-only --enable-static --disable-shared --disable-python-bindings
   make $NUM_THREAD
   make install
 }
 
 build_curl() {
+  echo '---------- Build Curl ----------'
   cd $BUILD_DIRECTORY
   $DOWNLOADER https://curl.haxx.se/download/curl-$CURL_VER.tar.xz
   tar xf curl-$CURL_VER.tar.xz
   cd curl-$CURL_VER
-  LIBS=$LIBS' -ldl -lpthread' ./configure --prefix=$PREFIX \
+  CFLAGS="$CFLAGS $CURL_CFLAGS" LIBS="$LIBS $CURL_LIBS" ./configure --prefix=$PREFIX --host=$TARGET_HOST \
     --enable-optimize --enable-ares --enable-proxy --enable-gopher --enable-libcurl-option --enable-ipv6 --enable-static \
     --disable-debug --disable-curldebug --disable-manual --disable-ldap --disable-ldaps --disable-sspi --disable-rtsp --disable-tftp \
     --disable-dict --disable-smb --disable-gopher --disable-imap --disable-smtp --disable-telnet --disable-pop3 --disable-alt-svc --disable-shared \
-    --without-libssh2 --without-gssapi --without-gnutls --without-libmetalink --without-libpsl
+    $CURL_SSLSEL --without-libssh2 --without-gssapi --without-gnutls --without-libmetalink --without-libpsl
   make $NUM_THREAD
   make install
 }
@@ -146,10 +204,18 @@ build_transmission() {
   git submodule update --init --recursive
   [ -n "$MODIFY_VERSION" ] && sed -E -i 's|m4_define\(\[user_agent_prefix\],\[\S+\]\)|m4_define([user_agent_prefix],['$MODIFY_VERSION'])|' configure.ac
   [ -n "$MODIFY_PEERVER" ] && sed -E -i 's|m4_define\(\[peer_id_prefix\],\[\S+\]\)|m4_define([peer_id_prefix],[-TR'$MODIFY_PEERVER'-])|' configure.ac
-  ./autogen.sh || true
+  ./autogen.sh --host=$TARGET_HOST || true
   echo '--------Start transmission configure--------'
-  LDFLAGS=$LDFLAGS' -Wl,-static -static-libgcc -static-libstdc++' LIBS=$LIBS' -ldl -lpthread -lrt -lm -lc' \
-    ./configure --prefix=$PREFIX_TRANSMISSION --enable-utp --enable-daemon --disable-nls --enable-static --disable-shared
+  CPPFLAGS="$TRANSMISSION_CPPFLAGS" LDFLAGS="$LDFLAGS $TRANSMISSION_LDFLAGS" LIBS="$LIBS $TRANSMISSION_LIBS" \
+    ./configure --prefix=$PREFIX_TRANSMISSION --host=$TARGET_HOST --enable-utp --enable-daemon --disable-nls --enable-static --disable-shared
+  cd third-party
+  make $NUM_THREAD
+  cp -n libutp/libutp.a $LD_LIBRARY_PATH
+  cp -n libnatpmp/libnatpmp.a $LD_LIBRARY_PATH
+  cp -n miniupnpc/libminiupnp.a $LD_LIBRARY_PATH
+  cp -n libb64/libb64.a $LD_LIBRARY_PATH
+  cp -n dht/libdht.a $LD_LIBRARY_PATH
+  cd ..
   echo '-----------Building transmission------------'
   make $NUM_THREAD
   make install

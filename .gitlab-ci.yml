@@ -125,3 +125,31 @@ build_old_clang:
   artifacts:
     paths: [ binary ]
     expose_as: transmission build result
+
+build_libs_mingw:
+  stage: build
+  when: manual
+  script:
+    - apt-get install -y mingw-w64 binutils-mingw-w64
+    - bash ./build.sh
+  variables:
+    BUILD_DEPS_ONLY: 'yes'
+    TARGET_HOST: i686-w64-mingw32
+  cache:
+    key: deps_mingw
+    paths: [ build_deps ]
+
+build_mingw:
+  stage: build
+  when: manual
+  script:
+    - apt-get install -y mingw-w64 binutils-mingw-w64
+    - bash ./build.sh
+  variables:
+    TARGET_HOST: i686-w64-mingw32
+  cache:
+    key: deps_mingw
+    paths: [ build_deps ]
+  artifacts:
+    paths: [ binary ]
+    expose_as: transmission build result
